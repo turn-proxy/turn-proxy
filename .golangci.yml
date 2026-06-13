@@ -1,0 +1,30 @@
+version: "2"
+
+linters:
+  enable:
+    - modernize
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - unconvert
+    - errname
+    - bodyclose
+    - revive
+  settings:
+    revive:
+      rules:
+        - name: unused-parameter
+          disabled: true
+  exclusions:
+    rules:
+      - source: '^\s*defer .*\.Close\(\)$'
+        linters:
+          - errcheck
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

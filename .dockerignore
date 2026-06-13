@@ -1,0 +1,14 @@
+.git
+.github
+.idea
+.serena
+.claude
+dist
+deploy
+*.tmp
+cookies.json
+*cookies*.json
+Dockerfile
+.dockerignore
+README*
+CLAUDE.md
