@@ -4,8 +4,9 @@ import (
 	"context"
 	"log/slog"
 	"net"
-	"sync/atomic"
 	"time"
+
+	"github.com/pion/transport/v4/deadline"
 )
 
 const (
@@ -19,22 +20,23 @@ type PacketSink interface {
 }
 
 type Endpoint struct {
-	inbox    *Inbox
-	sink     PacketSink
-	cancel   context.CancelFunc
-	remote   net.Addr
-	local    net.Addr
-	deadline atomic.Pointer[time.Time]
+	inbox        *Inbox
+	sink         PacketSink
+	cancel       context.CancelFunc
+	remote       net.Addr
+	local        net.Addr
+	readDeadline *deadline.Deadline
 }
 
 func NewEndpoint(ctx context.Context, sink PacketSink, remote, local net.Addr, capacity int) *Endpoint {
 	ctx, cancel := context.WithCancel(ctx)
 	return &Endpoint{
-		inbox:  NewInbox(capacity, ctx.Done()),
-		sink:   sink,
-		cancel: cancel,
-		remote: remote,
-		local:  local,
+		inbox:        NewInbox(capacity, ctx.Done()),
+		sink:         sink,
+		cancel:       cancel,
+		remote:       remote,
+		local:        local,
+		readDeadline: deadline.New(),
 	}
 }
 
@@ -45,11 +47,7 @@ func (e *Endpoint) Deliver(bp *[]byte) {
 }
 
 func (e *Endpoint) ReadFrom(b []byte) (int, net.Addr, error) {
-	var deadline time.Time
-	if d := e.deadline.Load(); d != nil {
-		deadline = *d
-	}
-	n, err := e.inbox.Pull(b, deadline)
+	n, err := e.inbox.Pull(b, e.readDeadline.Done())
 	if err != nil {
 		return 0, nil, err
 	}
@@ -68,7 +66,7 @@ func (e *Endpoint) Close() error {
 func (e *Endpoint) LocalAddr() net.Addr { return e.local }
 
 func (e *Endpoint) SetReadDeadline(t time.Time) error {
-	e.deadline.Store(&t)
+	e.readDeadline.Set(t)
 	return nil
 }
 

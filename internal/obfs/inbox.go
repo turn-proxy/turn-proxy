@@ -3,7 +3,6 @@ package obfs
 import (
 	"net"
 	"os"
-	"time"
 
 	"github.com/turn-proxy/turn-proxy/internal/bufpool"
 )
@@ -27,13 +26,7 @@ func (i *Inbox) Push(bp *[]byte) bool {
 	}
 }
 
-func (i *Inbox) Pull(b []byte, deadline time.Time) (int, error) {
-	var timeout <-chan time.Time
-	if !deadline.IsZero() {
-		timer := time.NewTimer(time.Until(deadline))
-		defer timer.Stop()
-		timeout = timer.C
-	}
+func (i *Inbox) Pull(b []byte, deadline <-chan struct{}) (int, error) {
 	select {
 	case bp := <-i.ch:
 		n := copy(b, *bp)
@@ -41,7 +34,7 @@ func (i *Inbox) Pull(b []byte, deadline time.Time) (int, error) {
 		return n, nil
 	case <-i.done:
 		return 0, net.ErrClosed
-	case <-timeout:
+	case <-deadline:
 		return 0, os.ErrDeadlineExceeded
 	}
 }
