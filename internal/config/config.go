@@ -16,11 +16,16 @@ type Config struct {
 	Upstream string         `json:"upstream"`
 	Broker   BrokerSettings `json:"broker"`
 	Turn     TurnSettings   `json:"turn"`
+	DNS      DNSSettings    `json:"dns"`
 }
 
 type BrokerSettings struct {
 	URL      string `json:"url"`
 	JoinLink string `json:"join_link"`
+}
+
+type DNSSettings struct {
+	Servers []string `json:"servers"`
 }
 
 const MaxStreams = 64

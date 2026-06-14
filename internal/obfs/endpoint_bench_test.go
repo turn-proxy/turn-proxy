@@ -2,14 +2,13 @@ package obfs
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/turn-proxy/turn-proxy/internal/bufpool"
 )
 
 func BenchmarkEndpointRoundtrip(b *testing.B) {
-	endpoint := NewEndpoint(context.Background(), nil, nil, nil, DefaultInboxCapacity)
+	endpoint := NewEndpoint(b.Context(), nil, nil, nil, DefaultInboxCapacity)
 	payload := bytes.Repeat([]byte{0xab}, 1200)
 	out := make([]byte, 2048)
 	b.ReportAllocs()

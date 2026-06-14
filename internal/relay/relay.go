@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -14,12 +15,16 @@ import (
 
 const allocTimeout = 10 * time.Second
 
+func IsQuotaReached(err error) bool {
+	var te *stun.TurnError
+	return errors.As(err, &te) && te.ErrorCodeAttr.Code == stun.CodeAllocQuotaReached
+}
+
 type Config struct {
-	Servers     []string
-	Username    string
-	Password    string
-	Transport   stun.ProtoType
-	ReadTimeout time.Duration
+	Servers   []string
+	Username  string
+	Password  string
+	Transport stun.ProtoType
 }
 
 type Allocation struct {
@@ -27,14 +32,13 @@ type Allocation struct {
 	RelayedAddr net.Addr
 	Selected    string
 
-	client  *turn.Client
-	rawConn net.PacketConn
-	wire    net.PacketConn
+	client *turn.Client
+	wire   net.PacketConn
 }
 
 func (a *Allocation) Close() {
-	if a.rawConn != nil {
-		_ = a.rawConn.Close()
+	if a.Relay != nil {
+		_ = a.Relay.Close()
 	}
 	if a.client != nil {
 		a.client.Close()
@@ -77,11 +81,13 @@ func allocateOne(server string, cfg *Config) (*Allocation, error) {
 	logFactory.DefaultLogLevel = logging.LogLevelWarn
 
 	client, err := turn.NewClient(&turn.ClientConfig{
-		TURNServerAddr: hostPort,
-		Conn:           wireConn,
-		Username:       cfg.Username,
-		Password:       cfg.Password,
-		LoggerFactory:  logFactory,
+		TURNServerAddr:         hostPort,
+		Conn:                   wireConn,
+		Net:                    directNet{},
+		Username:               cfg.Username,
+		Password:               cfg.Password,
+		RequestedAddressFamily: turn.RequestedAddressFamilyIPv4,
+		LoggerFactory:          logFactory,
 	})
 	if err != nil {
 		_ = wireConn.Close()
@@ -93,31 +99,25 @@ func allocateOne(server string, cfg *Config) (*Allocation, error) {
 		return nil, fmt.Errorf("turn listen: %w", err)
 	}
 
-	relayConn, err := allocateWithTimeout(client)
+	relayConn, err := client.Allocate()
 	if err != nil {
 		client.Close()
 		_ = wireConn.Close()
 		return nil, fmt.Errorf("turn allocate: %w", err)
 	}
 
-	wrapped := relayConn
-	if cfg.ReadTimeout > 0 {
-		wrapped = &timeoutConn{PacketConn: relayConn, readTimeout: cfg.ReadTimeout}
-	}
-
 	return &Allocation{
-		Relay:       wrapped,
+		Relay:       relayConn,
 		RelayedAddr: relayConn.LocalAddr(),
 		Selected:    server,
 		client:      client,
-		rawConn:     relayConn,
 		wire:        wireConn,
 	}, nil
 }
 
 func newWireConn(transport stun.ProtoType, hostPort string) (net.PacketConn, error) {
 	if transport == stun.ProtoTypeTCP {
-		conn, err := net.Dial("tcp", hostPort)
+		conn, err := net.DialTimeout("tcp", hostPort, allocTimeout)
 		if err != nil {
 			return nil, fmt.Errorf("dial tcp %s: %w", hostPort, err)
 		}
@@ -127,36 +127,4 @@ func newWireConn(transport stun.ProtoType, hostPort string) (net.PacketConn, err
 		return turn.NewSTUNConn(conn), nil
 	}
 	return net.ListenPacket("udp", "0.0.0.0:0")
-}
-
-type timeoutConn struct {
-	net.PacketConn
-	readTimeout time.Duration
-}
-
-func (c *timeoutConn) ReadFrom(b []byte) (int, net.Addr, error) {
-	if c.readTimeout > 0 {
-		if err := c.SetReadDeadline(time.Now().Add(c.readTimeout)); err != nil {
-			return 0, nil, err
-		}
-	}
-	return c.PacketConn.ReadFrom(b)
-}
-
-func allocateWithTimeout(client *turn.Client) (net.PacketConn, error) {
-	type result struct {
-		conn net.PacketConn
-		err  error
-	}
-	ch := make(chan result, 1)
-	go func() {
-		conn, err := client.Allocate()
-		ch <- result{conn, err}
-	}()
-	select {
-	case r := <-ch:
-		return r.conn, r.err
-	case <-time.After(allocTimeout):
-		return nil, fmt.Errorf("allocation timed out")
-	}
 }

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"net"
 	"net/netip"
 	"testing"
@@ -23,7 +22,7 @@ func benchUDPConn(b *testing.B) *net.UDPConn {
 
 func BenchmarkServerDemuxFolded(b *testing.B) {
 	sock := benchUDPConn(b)
-	peer := newPeer(context.Background(), sock, netip.MustParseAddrPort("127.0.0.1:40000"), peerInboxCap, time.Hour)
+	peer := newPeer(b.Context(), sock, netip.MustParseAddrPort("127.0.0.1:40000"), peerInboxCap, time.Hour)
 	defer peer.Close()
 
 	pkt := make([]byte, 1200)

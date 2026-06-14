@@ -1,7 +1,6 @@
 package obfs
 
 import (
-	"context"
 	"net"
 	"testing"
 	"time"
@@ -14,7 +13,7 @@ func TestSRTPConnCloseUnblocksRead(t *testing.T) {
 	}
 	defer sock.Close()
 
-	srtpPort := NewEndpoint(context.Background(), sock, sock.LocalAddr(), sock.LocalAddr(), DefaultInboxCapacity)
+	srtpPort := NewEndpoint(t.Context(), sock, sock.LocalAddr(), sock.LocalAddr(), DefaultInboxCapacity)
 	conn := NewSRTPConn(srtpPort, sock.LocalAddr(), nil, nil)
 
 	done := make(chan error, 1)

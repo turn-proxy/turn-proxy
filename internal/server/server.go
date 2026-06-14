@@ -37,7 +37,7 @@ func Serve(ctx context.Context, cfg config.Config) error {
 		slog.Info("new peer accepted", "peer", peer.src)
 		wg.Go(func() {
 			if err := runPeerSession(peer, cfg.Upstream); err != nil {
-				slog.Warn("peer session ended", "err", err)
+				slog.Warn("peer session ended", "peer", peer.src, "err", err)
 			}
 		})
 	}
@@ -53,12 +53,12 @@ func runPeerSession(peer *Peer, upstream string) error {
 		return fmt.Errorf("dtls accept: %w", err)
 	}
 	defer conn.Close()
-	slog.Info("dtls handshake completed with peer")
+	slog.Info("dtls handshake completed with peer", "peer", peer.src)
 	sender, receiver, err := obfs.DerivePair(conn, false)
 	if err != nil {
 		return fmt.Errorf("deriving srtp keys: %w", err)
 	}
-	slog.Info("srtp keys derived from dtls keying material")
+	slog.Info("srtp keys derived from dtls keying material", "peer", peer.src)
 	tunnel := obfs.NewSRTPConn(peer.srtp, peer.srcAddr, sender, receiver)
 
 	backendAddr, err := net.ResolveUDPAddr("udp", upstream)
@@ -71,6 +71,6 @@ func runPeerSession(peer *Peer, upstream string) error {
 	}
 
 	relayToPeer(tunnel, backend)
-	slog.Info("session closed")
+	slog.Info("session closed", "peer", peer.src)
 	return nil
 }

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"net"
 	"net/netip"
 	"testing"
@@ -15,7 +14,7 @@ func TestPeerIdleEviction(t *testing.T) {
 	}
 	defer sock.Close()
 
-	peer := newPeer(context.Background(), sock, netip.MustParseAddrPort("127.0.0.1:40000"), peerInboxCap, 50*time.Millisecond)
+	peer := newPeer(t.Context(), sock, netip.MustParseAddrPort("127.0.0.1:40000"), peerInboxCap, 50*time.Millisecond)
 	defer peer.Close()
 
 	select {
@@ -32,7 +31,7 @@ func TestPeerActiveNotEvicted(t *testing.T) {
 	}
 	defer sock.Close()
 
-	peer := newPeer(context.Background(), sock, netip.MustParseAddrPort("127.0.0.1:40001"), peerInboxCap, 80*time.Millisecond)
+	peer := newPeer(t.Context(), sock, netip.MustParseAddrPort("127.0.0.1:40001"), peerInboxCap, 80*time.Millisecond)
 	defer peer.Close()
 
 	deadline := time.After(300 * time.Millisecond)
