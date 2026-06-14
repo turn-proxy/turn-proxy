@@ -14,7 +14,7 @@ func TestSRTPConnCloseUnblocksRead(t *testing.T) {
 	defer sock.Close()
 
 	srtpPort := NewEndpoint(t.Context(), sock, sock.LocalAddr(), sock.LocalAddr(), DefaultInboxCapacity)
-	conn := NewSRTPConn(srtpPort, sock.LocalAddr(), nil, nil)
+	conn := NewSRTPConn(srtpPort, sock.LocalAddr(), nil, nil, false)
 
 	done := make(chan error, 1)
 	go func() {

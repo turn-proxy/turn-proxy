@@ -23,10 +23,10 @@ func TestRoundtripAes128CmHmacSha1_80(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if framed[0] != 0x80 || framed[1]&0x7f != payloadTypeOpus {
+	if framed[0] != 0x80 || framed[1]&0x7f != byte(FrameData) {
 		t.Fatalf("rtp header wrong: %x %x", framed[0], framed[1])
 	}
-	out, err := receiver.Parse(framed)
+	out, _, err := receiver.Parse(framed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestRoundtripAeadAes128Gcm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := receiver.Parse(framed)
+	out, _, err := receiver.Parse(framed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestTamperedFails(t *testing.T) {
 	receiver, _ := NewSRTPReceiver(k, s, srtp.ProtectionProfileAeadAes128Gcm)
 	framed, _ := sender.Frame([]byte("sensitive"))
 	framed[len(framed)-1] ^= 1
-	if _, err := receiver.Parse(framed); err == nil {
+	if _, _, err := receiver.Parse(framed); err == nil {
 		t.Fatal("expected decrypt failure")
 	}
 }

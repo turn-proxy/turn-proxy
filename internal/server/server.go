@@ -59,7 +59,7 @@ func runPeerSession(peer *Peer, upstream string) error {
 		return fmt.Errorf("deriving srtp keys: %w", err)
 	}
 	slog.Info("srtp keys derived from dtls keying material", "peer", peer.src)
-	tunnel := obfs.NewSRTPConn(peer.srtp, peer.srcAddr, sender, receiver)
+	tunnel := obfs.NewSRTPConn(peer.srtp, peer.srcAddr, sender, receiver, true)
 
 	backendAddr, err := net.ResolveUDPAddr("udp", upstream)
 	if err != nil {

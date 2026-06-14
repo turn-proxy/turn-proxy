@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net"
 	"sync"
@@ -126,7 +125,7 @@ func (p *streamPool) runStream(ctx context.Context, idx int) error {
 	return nil
 }
 
-func (p *streamPool) relayStreamToLocal(ctx context.Context, tunnel io.ReadWriteCloser) {
+func (p *streamPool) relayStreamToLocal(ctx context.Context, tunnel *srtpTunnel) {
 	stop := make(chan struct{})
 	var once sync.Once
 	shut := func() {
@@ -138,10 +137,29 @@ func (p *streamPool) relayStreamToLocal(ctx context.Context, tunnel io.ReadWrite
 	defer shut()
 
 	go func() {
-		select {
-		case <-ctx.Done():
-			shut()
-		case <-stop:
+		lifetime := time.After(streamLifetimeDeadline())
+		ticker := time.NewTicker(heartbeatInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				shut()
+				return
+			case <-stop:
+				return
+			case <-lifetime:
+				shut()
+				return
+			case <-ticker.C:
+				if time.Since(tunnel.LastInbound()) > stallTimeout {
+					shut()
+					return
+				}
+				if err := tunnel.WriteHeartbeat(); err != nil {
+					shut()
+					return
+				}
+			}
 		}
 	}()
 

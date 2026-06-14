@@ -31,7 +31,7 @@ func BenchmarkParse(b *testing.B) {
 	b.SetBytes(int64(len(pt)))
 	for b.Loop() {
 		framed, _ := sender.Frame(pt)
-		if _, err := receiver.Parse(framed); err != nil {
+		if _, _, err := receiver.Parse(framed); err != nil {
 			b.Fatal(err)
 		}
 	}

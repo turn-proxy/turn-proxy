@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"math/rand/v2"
 	"net"
@@ -26,6 +25,10 @@ const (
 	quotaBackoff          = 30 * time.Second
 	healthySession        = 5 * time.Second
 	targetRefreshInterval = 60 * time.Second
+	heartbeatInterval     = 5 * time.Second
+	stallTimeout          = 15 * time.Second
+	streamLifetime        = 3 * time.Minute
+	streamLifetimeJitter  = 60 * time.Second
 )
 
 func Run(ctx context.Context, cfg config.Config) error {
@@ -79,6 +82,10 @@ func jitter(d time.Duration) time.Duration {
 	return d/2 + time.Duration(rand.Int64N(int64(d)))
 }
 
+func streamLifetimeDeadline() time.Duration {
+	return streamLifetime + time.Duration(rand.Int64N(int64(streamLifetimeJitter)))
+}
+
 func rotateLeft(servers []string, k int) []string {
 	n := len(servers)
 	if n == 0 {
@@ -98,7 +105,7 @@ func (t *srtpTunnel) Close() error {
 	return t.SRTPConn.Close()
 }
 
-func buildTunnel(ctx context.Context, relayConn net.PacketConn, serverAddr net.Addr) (io.ReadWriteCloser, error) {
+func buildTunnel(ctx context.Context, relayConn net.PacketConn, serverAddr net.Addr) (*srtpTunnel, error) {
 	m := newMux(ctx, relayConn, serverAddr)
 	conn, err := dtls.ClientHandshake(m.dtls, serverAddr, dtls.DefaultMTU, dtls.HandshakeTimeout)
 	if err != nil {
@@ -109,5 +116,5 @@ func buildTunnel(ctx context.Context, relayConn net.PacketConn, serverAddr net.A
 		_ = conn.Close()
 		return nil, fmt.Errorf("deriving srtp keys: %w", err)
 	}
-	return &srtpTunnel{SRTPConn: obfs.NewSRTPConn(m.srtp, serverAddr, sender, receiver), dtls: conn}, nil
+	return &srtpTunnel{SRTPConn: obfs.NewSRTPConn(m.srtp, serverAddr, sender, receiver, false), dtls: conn}, nil
 }
