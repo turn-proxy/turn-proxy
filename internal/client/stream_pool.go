@@ -114,49 +114,56 @@ func (p *streamPool) runStream(ctx context.Context, idx int) error {
 		return fmt.Errorf("allocating turn relay: %w", err)
 	}
 	defer allocated.Close()
-	slog.Info("turn relay allocated", "relayed", allocated.RelayedAddr, "peer", target.serverAddr)
+	slog.Info("turn relay allocated", "stream", idx, "relayed", allocated.RelayedAddr, "peer", target.serverAddr)
 
 	tunnel, err := buildTunnel(ctx, allocated.Relay, target.serverAddr)
 	if err != nil {
 		return fmt.Errorf("building tunnel: %w", err)
 	}
 
-	p.relayStreamToLocal(ctx, tunnel)
+	p.relayStreamToLocal(ctx, idx, tunnel)
 	return nil
 }
 
-func (p *streamPool) relayStreamToLocal(ctx context.Context, tunnel *srtpTunnel) {
+func (p *streamPool) relayStreamToLocal(ctx context.Context, idx int, tunnel *srtpTunnel) {
 	stop := make(chan struct{})
 	var once sync.Once
-	shut := func() {
+	var reason string
+	shut := func(why string) {
 		once.Do(func() {
+			reason = why
 			close(stop)
 			_ = tunnel.Close()
 		})
 	}
-	defer shut()
+	defer func() {
+		shut("transport")
+		switch reason {
+		case "shutdown":
+		case "heartbeat":
+			slog.Warn("stream closed by heartbeat", "stream", idx)
+		default:
+			slog.Warn("stream closed", "stream", idx, "reason", reason)
+		}
+	}()
 
 	go func() {
-		lifetime := time.After(streamLifetimeDeadline())
 		ticker := time.NewTicker(heartbeatInterval)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
-				shut()
+				shut("shutdown")
 				return
 			case <-stop:
 				return
-			case <-lifetime:
-				shut()
-				return
 			case <-ticker.C:
 				if time.Since(tunnel.LastInbound()) > stallTimeout {
-					shut()
+					shut("heartbeat")
 					return
 				}
 				if err := tunnel.WriteHeartbeat(); err != nil {
-					shut()
+					shut("transport")
 					return
 				}
 			}
@@ -170,7 +177,7 @@ func (p *streamPool) relayStreamToLocal(ctx context.Context, tunnel *srtpTunnel)
 				_, err := tunnel.Write(*bp)
 				bufpool.Put(bp)
 				if err != nil {
-					shut()
+					shut("transport")
 					return
 				}
 			case <-stop:

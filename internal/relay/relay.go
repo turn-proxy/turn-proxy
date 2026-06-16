@@ -14,8 +14,7 @@ import (
 )
 
 const (
-	allocTimeout        = 10 * time.Second
-	permRefreshInterval = 30 * time.Minute
+	allocTimeout = 10 * time.Second
 )
 
 func IsQuotaReached(err error) bool {
@@ -84,14 +83,13 @@ func allocateOne(server string, cfg *Config) (*Allocation, error) {
 	logFactory.DefaultLogLevel = logging.LogLevelWarn
 
 	client, err := turn.NewClient(&turn.ClientConfig{
-		TURNServerAddr:            hostPort,
-		Conn:                      wireConn,
-		Net:                       directNet{},
-		Username:                  cfg.Username,
-		Password:                  cfg.Password,
-		RequestedAddressFamily:    turn.RequestedAddressFamilyIPv4,
-		PermissionRefreshInterval: permRefreshInterval,
-		LoggerFactory:             logFactory,
+		TURNServerAddr:         hostPort,
+		Conn:                   wireConn,
+		Net:                    directNet{},
+		Username:               cfg.Username,
+		Password:               cfg.Password,
+		RequestedAddressFamily: turn.RequestedAddressFamilyIPv4,
+		LoggerFactory:          logFactory,
 	})
 	if err != nil {
 		_ = wireConn.Close()

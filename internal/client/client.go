@@ -27,8 +27,6 @@ const (
 	targetRefreshInterval = 60 * time.Second
 	heartbeatInterval     = 5 * time.Second
 	stallTimeout          = 15 * time.Second
-	streamLifetime        = 3 * time.Minute
-	streamLifetimeJitter  = 60 * time.Second
 )
 
 func Run(ctx context.Context, cfg config.Config) error {
@@ -80,10 +78,6 @@ func jitter(d time.Duration) time.Duration {
 		return d
 	}
 	return d/2 + time.Duration(rand.Int64N(int64(d)))
-}
-
-func streamLifetimeDeadline() time.Duration {
-	return streamLifetime + time.Duration(rand.Int64N(int64(streamLifetimeJitter)))
 }
 
 func rotateLeft(servers []string, k int) []string {
